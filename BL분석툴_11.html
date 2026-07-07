@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>INBOUND B/L MAIN ITEM 및 DESC 검증 툴</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2128;
+    --border: #30363d;
+    --accent: #2f81f7;
+    --accent2: #f78166;
+    --accent3: #3fb950;
+    --warn: #d29922;
+    --text: #e6edf3;
+    --text2: #8b949e;
+    --text3: #6e7681;
+    --radius: 8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 100;
+  }
+  .logo {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+  .logo span { color: var(--text2); font-weight: 400; }
+  .tab-bar { display: flex; gap: 4px; margin-left: auto; }
+  .tab {
+    padding: 6px 16px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text2);
+    border: 1px solid transparent;
+    transition: all .15s;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .tab:hover { color: var(--text); background: var(--surface); }
+  .tab.active { color: var(--text); background: var(--surface2); border-color: var(--border); }
+
+  /* ── MAIN ── */
+  main { max-width: 1400px; margin: 0 auto; padding: 32px; }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* ── UPLOAD ZONE ── */
+  .upload-area {
+    border: 1.5px dashed var(--border);
+    border-radius: 12px;
+    padding: 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s;
+    position: relative;
+    margin-bottom: 24px;
+  }
+  .upload-area:hover, .upload-area.drag { border-color: var(--accent); background: rgba(47,129,247,.05); }
+  .upload-area input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+  .upload-icon { font-size: 36px; margin-bottom: 10px; }
+  .upload-area h3 { font-size: 15px; font-weight: 500; margin-bottom: 6px; }
+  .upload-area p { color: var(--text2); font-size: 13px; }
+  .upload-area.loaded { border-color: var(--accent3); background: rgba(63,185,80,.05); }
+  .upload-area.loaded .upload-icon::after { content: ' ✓'; color: var(--accent3); }
+
+  /* ── TWO-UPLOAD GRID ── */
+  .upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+
+  /* ── BTN ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 20px; border-radius: var(--radius);
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    border: none; font-family: 'Noto Sans KR', sans-serif;
+    transition: all .15s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #388bfd; }
+  .btn-primary:disabled { background: var(--surface2); color: var(--text3); cursor: not-allowed; }
+  .btn-success { background: var(--accent3); color: #000; }
+  .btn-success:hover { filter: brightness(1.1); }
+  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--surface); }
+
+  .action-row { display: flex; gap: 10px; align-items: center; margin-bottom: 24px; }
+
+  /* ── STATUS ── */
+  .status-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: var(--text2);
+    display: none;
+  }
+  .status-bar.show { display: block; }
+
+  /* ── STATS CARDS ── */
+  .stats { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 20px;
+    min-width: 130px;
+  }
+  .stat-card .label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+  .stat-card .value { font-size: 24px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .stat-card .value.red { color: var(--accent2); }
+  .stat-card .value.yellow { color: var(--warn); }
+  .stat-card .value.green { color: var(--accent3); }
+  .stat-card .value.blue { color: var(--accent); }
+
+  /* ── TABLE ── */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    background: var(--surface2);
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 500;
+    font-size: 12px;
+    color: var(--text2);
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+  }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface); }
+  tbody td { padding: 10px 14px; vertical-align: top; }
+  .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 20px;
+    font-size: 11px; font-weight: 500; white-space: nowrap;
+  }
+  .badge-red { background: rgba(247,129,102,.15); color: #f78166; border: 1px solid rgba(247,129,102,.3); }
+  .badge-yellow { background: rgba(210,153,34,.15); color: #d29922; border: 1px solid rgba(210,153,34,.3); }
+  .badge-blue { background: rgba(47,129,247,.15); color: #7cb9f9; border: 1px solid rgba(47,129,247,.3); }
+  .badge-green { background: rgba(63,185,80,.15); color: #3fb950; border: 1px solid rgba(63,185,80,.3); }
+  .badge-orange { background: rgba(224,145,90,.15); color: #e0915a; border: 1px solid rgba(224,145,90,.3); }
+
+  .desc-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text2);
+    white-space: pre-wrap;
+    max-height: 100px;
+    overflow-y: auto;
+    margin-top: 4px;
+  }
+  .highlight { color: var(--accent2); font-weight: 600; }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text3);
+  }
+  .empty-state .big { font-size: 40px; margin-bottom: 12px; }
+  .empty-state p { font-size: 14px; }
+
+  /* ── SECTION TITLE ── */
+  .section-label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--text3); margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+  }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ── DG TABLE specific ── */
+  .imdg-tag {
+    display: inline-block; padding: 2px 7px; border-radius: 4px;
+    font-size: 11px; font-family: 'JetBrains Mono', monospace; font-weight: 600;
+    background: rgba(247,129,102,.12); color: #f78166; margin: 1px;
+  }
+  .imdg-3 { background: rgba(247,129,102,.2); color: #ff9580; }
+  .imdg-6 { background: rgba(130,80,255,.2); color: #b39dff; }
+  .imdg-8 { background: rgba(255,200,0,.15); color: #f0c040; }
+  .imdg-9 { background: rgba(63,185,80,.15); color: #3fb950; }
+
+  /* ── FILTER ROW ── */
+  .filter-row { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+  .search-input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 7px 12px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: 'Noto Sans KR', sans-serif;
+    width: 240px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--text3); }
+
+  select.search-input { cursor: pointer; }
+
+  /* ── TOOLTIP ── */
+  .info-tip { color: var(--text3); font-size: 12px; cursor: help; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">INBOUND B/L<span> · </span>MAIN ITEM 및 DESC 검증 툴</div>
+  <div class="tab-bar">
+    <div class="tab active" onclick="switchTab('mismatch')">📋 품명 불일치 검출</div>
+    <div class="tab" onclick="switchTab('dg')">⚠️ 위험물 CNEE 추출</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ══ TAB 1: 품명 불일치 ══ -->
+  <div class="panel active" id="panel-mismatch">
+    <div class="upload-area" id="drop1" ondragover="ev.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event,'bl1')">
+      <input type="file" accept=".xls,.xlsx" onchange="loadFile(this.files[0],'bl1')">
+      <div class="upload-icon">📂</div>
+      <h3>B/L 목록 파일 업로드</h3>
+      <p>Description과 Main Item 컬럼이 포함된 xls/xlsx</p>
+    </div>
+
+    <div class="action-row">
+      <button class="btn btn-primary" id="btn-run1" onclick="runMismatch()" disabled>🔍 분석 시작</button>
+      <button class="btn btn-ghost" onclick="exportMismatch()" id="btn-export1" style="display:none">⬇️ Excel 다운로드</button>
+    </div>
+
+    <div class="status-bar" id="status1"></div>
+
+    <div id="result-mismatch"></div>
+  </div>
+
+  <!-- ══ TAB 2: 위험물 CNEE ══ -->
+  <div class="panel" id="panel-dg">
+    <div class="upload-grid">
+      <div class="upload-area" id="drop2a" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event,'dg_main')">
+        <input type="file" accept=".xls,.xlsx" onchange="loadFile(this.files[0],'dg_main')">
+        <div class="upload-icon">📂</div>
+        <h3>B/L 목록 (품명확인 파일)</h3>
+        <p>Consignee, Description, AFR 연락처 포함</p>
+      </div>
+      <div class="upload-area" id="drop2b" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event,'dg_list')">
+        <input type="file" accept=".xls,.xlsx" onchange="loadFile(this.files[0],'dg_list')">
+        <div class="upload-icon">⚠️</div>
+        <h3>위험물 검사증 파일</h3>
+        <p>BLNO, IMDG, UNNO, 적정선적명 포함</p>
+      </div>
+    </div>
+
+    <div class="action-row">
+      <button class="btn btn-primary" id="btn-run2" onclick="runDG()" disabled>🔍 분석 시작</button>
+      <button class="btn btn-success" onclick="exportDG()" id="btn-export2" style="display:none">⬇️ Excel 다운로드</button>
+    </div>
+
+    <div class="status-bar" id="status2"></div>
+    <div id="result-dg"></div>
+  </div>
+
+</main>
+
+<script>
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+const files = {};
+let mismatchResults = [];
+let dgResults = [];
+
+// ═══════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    t.classList.toggle('active', (name==='mismatch'?i===0:i===1));
+  });
+  document.getElementById('panel-mismatch').classList.toggle('active', name==='mismatch');
+  document.getElementById('panel-dg').classList.toggle('active', name==='dg');
+}
+
+function setStatus(id, msg, type='info') {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = 'status-bar show';
+  el.style.color = type==='error'?'var(--accent2)':type==='ok'?'var(--accent3)':'var(--text2)';
+}
+
+function handleDrop(ev, key) {
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('drag');
+  const f = ev.dataTransfer.files[0];
+  if(f) loadFile(f, key);
+}
+
+// ═══════════════════════════════════════════
+// FILE LOADING
+// ═══════════════════════════════════════════
+function loadFile(file, key) {
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(ws, {defval:''});
+      files[key] = data;
+
+      // mark upload area
+      const areaMap = {bl1:'drop1', dg_main:'drop2a', dg_list:'drop2b'};
+      const area = document.getElementById(areaMap[key]);
+      if(area) {
+        area.classList.add('loaded');
+        area.querySelector('h3').textContent = `✓ ${file.name} (${data.length}행)`;
+      }
+
+      // enable buttons
+      if(key==='bl1') document.getElementById('btn-run1').disabled = false;
+      if((key==='dg_main'||key==='dg_list') && files.dg_main && files.dg_list)
+        document.getElementById('btn-run2').disabled = false;
+    } catch(err) {
+      alert('파일 읽기 오류: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ═══════════════════════════════════════════
+// TAB 1: 품명 불일치 분석
+// ═══════════════════════════════════════════
+
+// ═══════════════════════════════════════════
+// 영단어 사전 체크
+// ═══════════════════════════════════════════
+const COMMON_WORDS = new Set(`
+a able about above across act actually add afraid after again age ago
+agree air all allow almost alone along already also always among and
+animal another answer any appear area around ask at away
+back bad bag ball base be bear beat beautiful because become before
+begin believe below best better big black block blue board boat body
+book both bottom box boy break bright bring brother build burn but
+cable call came can car card care carry case cause chance change check
+chemical child city claim class clean clear close cold collect come
+common complete contain control cool copy cost could count cover create
+cut dark data dead deal deep degree depend describe design detail die
+different direct door double down draw dry during dust
+each early earth easy edge effect end energy enjoy enter entire equal
+even event ever every exact example except exist expect experience
+factor far fast feel fill final find fire first fish floor flow follow
+food force foreign form found free fresh front full function
+game garden get give glass go gold good great green ground grow
+half hand happen hard have head help here high hold home hot house
+how human hurt idea image include increase indicate industrial inside
+instead interest into iron island its
+join just keep kind large last lead learn leave less level life
+light like line liquid list local long look low
+machine made main make many mark material matter mean measure meet
+metal might model money month more most move must
+natural need new next night none nor now number object off oil
+old once only open order other outside over own
+paper part pass past pay people place plan plant point power press
+price process produce product provide public pull push
+quality quantity quite raise range reach read receive red reduce replace
+result right rise road room round run safe same sand say
+second see seem send set short should side sign simple since size
+small some source south space specific standard start state step
+still stop store straight such sure surface system
+table take team tell than these think though three through time
+together top total touch trade treat tree turn type under unit until
+use value view wait want water well white wide wood work world
+write year yet young
+`.trim().split(/\s+/).filter(Boolean));
+
+// 화물 도메인 특수 허용 단어 (화학명, 단위, 무역용어, 식품, 의류, 기계 등)
+const TRADE_WORDS = new Set(`
+frozen fresh dried processed packaged refined crude synthetic organic
+inorganic alloy coated laminated woven knitted printed bleached
+unbleached boneless fillet sliced minced chilled canned packed
+steel iron copper aluminum aluminium brass bronze nickel zinc
+titanium chrome manganese silicon carbon tungsten magnet ferrite
+resin polymer fiber fibre yarn fabric textile
+sodium potassium calcium chloride sulfate phosphate acetate
+hydroxide oxide carbonate nitrate glycol ethyl methyl propyl butyl
+polyphenylene sulfide polymers composite insulators
+kraft pulp cellulose glucose fructose starch
+pvc abs pet hdpe ldpe pp polypropylene polyester polyethylene
+nylon acrylic silicone rubber latex foam
+scrap waste recycled reclaimed secondhand
+cif fob exw ddp cnf cfr freight prepaid collect
+carton pallet drum barrel flexitank bulk loose
+mango banana apple orange lemon lime grape cherry berry coconut
+cashew almond walnut peanut sesame rice wheat barley
+chicken beef pork lamb fish shrimp prawn squid octopus anchovy
+milk butter cheese cream sauce extract powder
+shoes boots sandals slipper footwear
+jacket pants skirt shirt blouse dress coat sweater hoody
+swimwear bikini garment apparel sleeve inner pillow comforter
+mattress furniture wooden kitchenware
+tube pipe valve pump compressor assembly suction catheter
+seatbelt retractor pretensioner harness safety helmet
+probe terminal connector bracket adapter
+infusion extension connecting equipment protective
+slats board plank panel sheet strip
+kids baby infant toddler
+chilli pepper spice herb vanilla
+grade spec standard percent without inner fresh frozen dried
+fermentation ferrite magnet antenna
+assembly assembling manufacturing protector
+hockey football tennis badminton sports
+chrysanthemum ruscus flower bouquet
+bran rice grain cereal
+women woman mens apparel apparels
+knee elbow calf ankle wrist shoulder
+ethanol anhydrous methanol butanol propanol
+`.trim().split(/\s+/).filter(Boolean));
+
+function checkDictionary(main) {
+  // 순수 영문 단어만 추출 (숫자, 특수문자, 화학식 제외)
+  const words = main.toUpperCase().split(/[\s,\/\+\-\(\)\.]+/)
+    .map(w => w.replace(/[^A-Z]/g, ''))
+    .filter(w => w.length >= 4 && !/^\d+$/.test(w));
+
+  if(words.length === 0) return { suspicious: false, unknownWords: [] };
+
+  const unknownWords = words.filter(w => {
+    const lw = w.toLowerCase();
+    return !COMMON_WORDS.has(lw) && !TRADE_WORDS.has(lw);
+  });
+
+  // 50% 이상이 모르는 단어일 때만 의심
+  const ratio = unknownWords.length / words.length;
+  return { suspicious: ratio >= 0.5, unknownWords, ratio };
+}
+
+function normText(s) {
+  return String(s).toUpperCase().replace(/[^A-Z0-9가-힣]+/g,' ').trim();
+}
+
+function getWords(s) {
+  return normText(s).split(' ').filter(w => w.length > 3);
+}
+
+function analyzeRow(row) {
+  const blNo = row['B/L No.'] || row['BL No'] || row['BLNO'] || '';
+  const descRaw = String(row['Description'] || '').replace(/\r/g, '').trim();
+  const desc = descRaw.replace(/\n/g, ' ').trim();
+  const main = String(row['Main Item'] || '').trim();
+  const cnee = row['Consignee Name'] || row['Consignee'] || '';
+
+  if(!main || main==='nan' || !desc || desc==='nan') return null;
+
+  const mainWords = getWords(main);
+  if(mainWords.length === 0) return null;
+
+  const descNorm = normText(desc);
+  const hasETC = /\bETC\b/i.test(main);
+  const matchedWords = mainWords.filter(w => descNorm.includes(w));
+  const unmatchedWords = mainWords.filter(w => !descNorm.includes(w));
+
+  // 전부 매칭 → 정상이지만 품명 유효성 체크 추가
+  if(matchedWords.length === mainWords.length) {
+    const dictCheck = checkDictionary(main);
+    if(dictCheck.suspicious) {
+      return { blNo, cnee, desc: descRaw, main, level: 'check',
+        reason: `품명 확인요망 — 알 수 없는 단어 포함: (${dictCheck.unknownWords.join(', ')})`,
+        matchedWords, ratio: 1 };
+    }
+    return { blNo, cnee, desc: descRaw, main, level: 'normal', matchedWords, ratio: 1 };
+  }
+
+  // 하나라도 매칭
+  if(matchedWords.length > 0) {
+    if(hasETC) {
+      return { blNo, cnee, desc: descRaw, main, level: 'caution',
+        reason: `ETC 포함 — 일부 키워드 매칭 (${matchedWords.join(', ')}) / 미매칭: ${unmatchedWords.join(', ')}`,
+        matchedWords, ratio: matchedWords.length / mainWords.length };
+    }
+    return { blNo, cnee, desc: descRaw, main, level: 'check',
+      reason: `일부 키워드만 매칭 — 매칭: (${matchedWords.join(', ')}) / 미매칭: (${unmatchedWords.join(', ')})`,
+      matchedWords, ratio: matchedWords.length / mainWords.length };
+  }
+
+  // 하나도 없음 → 즉시확인
+  return { blNo, cnee, desc: descRaw, main, level: 'critical',
+    reason: `Main Item 키워드가 Description에 전혀 없음`, matchedWords: [], ratio: 0 };
+}
+
+function runMismatch() {
+  const data = files.bl1;
+  setStatus('status1', `${data.length}건 분석 중...`);
+  
+  setTimeout(() => {
+    const all = data.map(analyzeRow).filter(Boolean);
+    mismatchResults = all.filter(r => r.level !== 'normal');
+    window._allResults = all; // 정상건 포함 전체
+    renderMismatch();
+  }, 50);
+}
+
+function highlightDesc(desc, words) {
+  let s = escHtml(desc).replace(/\n/g, '<br>');
+  words.forEach(w => {
+    const re = new RegExp('(' + w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')', 'gi');
+    s = s.replace(re, '<mark style="background:rgba(63,185,80,.25);color:#3fb950;border-radius:2px;padding:0 2px;font-weight:600">$1</mark>');
+  });
+  return s;
+}
+
+function toggleNormal(idx) {
+  const el = document.getElementById('normal-detail-' + idx);
+  const btn = document.getElementById('normal-btn-' + idx);
+  if(el.style.display === 'none') {
+    el.style.display = 'block';
+    btn.textContent = '▲ 닫기';
+  } else {
+    el.style.display = 'none';
+    btn.textContent = '▼ 상세보기';
+  }
+}
+
+function renderMismatch(filter='all', search='') {
+  const container = document.getElementById('result-mismatch');
+  const total = files.bl1?.length || 0;
+  const allResults = window._allResults || [];
+  const normalResults = allResults.filter(r => r.level === 'normal');
+  const critical = mismatchResults.filter(r=>r.level==='critical').length;
+  const checkCnt = mismatchResults.filter(r=>r.level==='check').length;
+  const caution = mismatchResults.filter(r=>r.level==='caution').length;
+
+  setStatus('status1', `분석 완료 — 전체 ${total}건 중 주의 대상 ${mismatchResults.length}건 발견`, 'ok');
+  document.getElementById('btn-export1').style.display = mismatchResults.length ? '' : 'none';
+
+  let filtered = mismatchResults;
+  let showNormal = (filter === 'normal');
+  if(filter==='critical') filtered = filtered.filter(r=>r.level==='critical');
+  if(filter==='check') filtered = filtered.filter(r=>r.level==='check');
+  if(filter==='caution') filtered = filtered.filter(r=>r.level==='caution');
+  let filteredNormal = normalResults;
+  if(search) {
+    const s = search.toUpperCase();
+    filtered = filtered.filter(r => r.blNo.toUpperCase().includes(s) || r.cnee.includes(s) || r.main.toUpperCase().includes(s));
+    filteredNormal = normalResults.filter(r => r.blNo.toUpperCase().includes(s) || r.cnee.includes(s) || r.main.toUpperCase().includes(s));
+  }
+
+  const renderIssueTable = (rows) => rows.length === 0
+    ? `<div class="empty-state"><div class="big">✅</div><p>해당 조건의 B/L이 없습니다.</p></div>`
+    : `<div class="table-wrap"><table>
+        <thead><tr>
+          <th>등급</th><th>B/L No.</th><th>CNEE</th>
+          <th>MAIN ITEM (세관신고)</th><th>Description</th><th>판정 사유</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr>
+              <td><span class="badge ${r.level==='critical'?'badge-red':r.level==='check'?'badge-orange':'badge-yellow'}">${r.level==='critical'?'🔴 즉시확인':r.level==='check'?'🟠 확인요망':'🟡 주의'}</span></td>
+              <td class="mono">${r.blNo}</td>
+              <td>${r.cnee}</td>
+              <td><strong>${r.main}</strong></td>
+              <td><div class="desc-box">${escHtml(r.desc.substring(0,300))}${r.desc.length>300?'…':''}</div></td>
+              <td style="color:var(--text2);font-size:12px">${r.reason}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table></div>`;
+
+  const renderNormalTable = (rows) => rows.length === 0
+    ? `<div class="empty-state"><div class="big">🔍</div><p>검색 결과 없음</p></div>`
+    : `<div class="table-wrap"><table>
+        <thead><tr>
+          <th>등급</th><th>B/L No.</th><th>CNEE</th>
+          <th>MAIN ITEM (세관신고)</th><th>매칭 키워드</th><th>상세</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map((r, i) => `
+            <tr>
+              <td><span class="badge badge-green">✅ 정상</span></td>
+              <td class="mono">${r.blNo}</td>
+              <td>${r.cnee}</td>
+              <td><strong>${r.main}</strong></td>
+              <td style="font-size:12px">
+                ${r.matchedWords.map(w=>`<span style="display:inline-block;background:rgba(63,185,80,.15);color:#3fb950;border-radius:3px;padding:1px 6px;margin:1px;font-family:monospace;font-size:11px">${w}</span>`).join(' ')}
+                <span style="color:var(--text3);font-size:11px;margin-left:4px">(${Math.round(r.ratio*100)}% 매칭)</span>
+              </td>
+              <td>
+                <button id="normal-btn-${i}" class="btn btn-ghost" style="padding:3px 10px;font-size:11px" onclick="toggleNormal(${i})">▼ 상세보기</button>
+                <div id="normal-detail-${i}" style="display:none;margin-top:8px">
+                  <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Description (매칭 키워드 강조)</div>
+                  <div class="desc-box" style="max-height:160px">${highlightDesc(r.desc, r.matchedWords)}</div>
+                </div>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table></div>`;
+
+  container.innerHTML = `
+    <div class="stats">
+      <div class="stat-card"><div class="label">전체 B/L</div><div class="value blue">${total}</div></div>
+      <div class="stat-card"><div class="label">즉시 확인</div><div class="value red">${critical}</div></div>
+      <div class="stat-card"><div class="label">확인요망</div><div class="value" style="color:#e0915a">${checkCnt}</div></div>
+      <div class="stat-card"><div class="label">주의</div><div class="value yellow">${caution}</div></div>
+      <div class="stat-card"><div class="label">정상</div><div class="value green">${normalResults.length}</div></div>
+    </div>
+    <div class="filter-row">
+      <input class="search-input" type="text" placeholder="B/L No. / CNEE / 품목 검색" oninput="renderMismatch(document.getElementById('flt-level').value, this.value)">
+      <select class="search-input" id="flt-level" onchange="renderMismatch(this.value, document.querySelector('.filter-row input').value)" style="width:200px">
+        <option value="all" ${filter==='all'?'selected':''}>전체 이슈 (${mismatchResults.length})</option>
+        <option value="critical" ${filter==='critical'?'selected':''}>🔴 즉시확인 (${critical})</option>
+        <option value="check" ${filter==='check'?'selected':''}>🟠 확인요망 (${checkCnt})</option>
+        <option value="caution" ${filter==='caution'?'selected':''}>🟡 주의 (${caution})</option>
+        <option value="normal" ${filter==='normal'?'selected':''}>✅ 정상 (${normalResults.length})</option>
+      </select>
+    </div>
+    ${showNormal ? renderNormalTable(filteredNormal) : renderIssueTable(filtered)}
+  `;
+}
+
+// ═══════════════════════════════════════════
+// TAB 2: 위험물 CNEE
+// ═══════════════════════════════════════════
+function extractTel(str) {
+  if(!str) return '';
+  const m = String(str).match(/TEL\s*[:\s]*([\+\d][\d\s\-\(\)]{6,})/i);
+  return m ? m[1].trim() : '';
+}
+function extractFax(str) {
+  if(!str) return '';
+  const m = String(str).match(/FAX\s*[:\s]*([\+\d][\d\s\-\(\)]{6,})/i);
+  return m ? m[1].trim() : '';
+}
+function cleanName(str) {
+  if(!str) return '';
+  return String(str).replace(/(TEL|FAX|MOBILE|E-MAIL|EMAIL)[\s\S]*/i,'').trim();
+}
+
+function getImdgClass(cls) {
+  const c = String(cls).replace('.0','');
+  return `<span class="imdg-tag imdg-${c}">Class ${c}</span>`;
+}
+
+function runDG() {
+  const mainData = files.dg_main;
+  const dgData = files.dg_list;
+  setStatus('status2', '분석 중...');
+
+  setTimeout(() => {
+    // BL별 위험물 그룹핑
+    const dgMap = {};
+    for(const row of dgData) {
+      const bl = String(row['BLNO']||'').trim();
+      if(!bl || bl==='nan') continue;
+      if(!dgMap[bl]) dgMap[bl] = [];
+      dgMap[bl].push({
+        imdg: String(row['IMDG']||'').replace('.0',''),
+        unno: String(row['UNNO']||'').replace('.0',''),
+        cargo: String(row['적정선적명']||'').trim(),
+      });
+    }
+
+    // BL 정보 매핑
+    const blMap = {};
+    for(const row of mainData) {
+      const bl = String(row['B/L No.']||'').trim();
+      if(bl) blMap[bl] = row;
+    }
+
+    dgResults = [];
+    for(const [bl, dgs] of Object.entries(dgMap)) {
+      const info = blMap[bl] || {};
+      const cneeKr = String(info['Consignee Name']||'').trim();
+      const cneeEn = cleanName(info['C.Name(AFR)']);
+      const addr = String(info['C.Addr(AFR)']||'');
+      const main = String(info['Main Item']||'').trim();
+      const tel = extractTel(addr) || extractTel(String(info['Description']||''));
+      const fax = extractFax(addr);
+
+      dgResults.push({ bl, cneeKr, cneeEn, tel, fax, main, dgs });
+    }
+
+    renderDG();
+  }, 50);
+}
+
+function renderDG(search='') {
+  const container = document.getElementById('result-dg');
+  setStatus('status2', `분석 완료 — 위험물 B/L ${dgResults.length}건 추출`, 'ok');
+  document.getElementById('btn-export2').style.display = dgResults.length ? '' : 'none';
+
+  let filtered = dgResults;
+  if(search) {
+    const s = search.toUpperCase();
+    filtered = filtered.filter(r => r.bl.toUpperCase().includes(s) || r.cneeKr.includes(s) || r.cneeEn.toUpperCase().includes(s));
+  }
+
+  container.innerHTML = `
+    <div class="stats">
+      <div class="stat-card"><div class="label">위험물 B/L</div><div class="value red">${dgResults.length}</div></div>
+      <div class="stat-card"><div class="label">Class 3 (인화성)</div><div class="value" style="color:#ff9580">${dgResults.filter(r=>r.dgs.some(d=>d.imdg==='3')).length}</div></div>
+      <div class="stat-card"><div class="label">Class 6/8 (독성/부식)</div><div class="value yellow">${dgResults.filter(r=>r.dgs.some(d=>d.imdg==='6'||d.imdg==='8')).length}</div></div>
+      <div class="stat-card"><div class="label">Class 9 (환경유해)</div><div class="value green">${dgResults.filter(r=>r.dgs.some(d=>d.imdg==='9')).length}</div></div>
+      <div class="stat-card"><div class="label">연락처 미확인</div><div class="value yellow">${dgResults.filter(r=>!r.tel).length}</div></div>
+    </div>
+    <div class="filter-row">
+      <input class="search-input" type="text" placeholder="B/L No. / CNEE 검색" oninput="renderDG(this.value)">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>B/L No.</th>
+            <th>CNEE (국문)</th>
+            <th>CNEE (영문)</th>
+            <th>TEL</th>
+            <th>FAX</th>
+            <th>품목</th>
+            <th>IMDG / UN No.</th>
+            <th>적정선적명</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filtered.map(r => `
+            <tr>
+              <td class="mono">${r.bl}</td>
+              <td><strong>${r.cneeKr||'<span style="color:var(--text3)">미지정</span>'}</strong></td>
+              <td style="font-size:12px;color:var(--text2)">${r.cneeEn||'-'}</td>
+              <td>${r.tel ? `<span style="color:var(--accent3);font-family:'JetBrains Mono',monospace;font-size:12px">${r.tel}</span>` : `<span class="badge badge-yellow">확인필요</span>`}</td>
+              <td style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2)">${r.fax||'-'}</td>
+              <td style="font-size:12px">${r.main.substring(0,50)}${r.main.length>50?'…':''}</td>
+              <td>${r.dgs.map(d=>`${getImdgClass(d.imdg)} <span style="font-family:monospace;font-size:11px;color:var(--text2)">UN ${d.unno}</span>`).join('<br>')}</td>
+              <td style="font-size:11px;color:var(--text2)">${r.dgs.map(d=>d.cargo).filter((v,i,a)=>a.indexOf(v)===i).join('<br>')}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════════
+function exportMismatch() {
+  const rows = mismatchResults.map(r => ({
+    '등급': r.level==='critical'?'즉시확인':'주의',
+    'B/L No.': r.blNo,
+    'CNEE': r.cnee,
+    'MAIN ITEM': r.main,
+    'Description': r.desc,
+    '판정 사유': r.reason,
+  }));
+  downloadXlsx(rows, '품명불일치_분석결과');
+}
+
+function exportDG() {
+  const rows = dgResults.flatMap(r => r.dgs.map(d => ({
+    'B/L No.': r.bl,
+    'CNEE (국문)': r.cneeKr,
+    'CNEE (영문)': r.cneeEn,
+    'TEL': r.tel,
+    'FAX': r.fax,
+    '품목명': r.main,
+    'IMDG Class': d.imdg,
+    'UN No.': d.unno,
+    '적정선적명': d.cargo,
+  })));
+  downloadXlsx(rows, '위험물_CNEE연락처');
+}
+
+function downloadXlsx(rows, name) {
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
+  // 컬럼 너비 자동 조정
+  const cols = Object.keys(rows[0]||{}).map(k => ({ wch: Math.max(k.length, 15) }));
+  ws['!cols'] = cols;
+  XLSX.utils.book_append_sheet(wb, ws, name.substring(0,31));
+  XLSX.writeFile(wb, `${name}_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>

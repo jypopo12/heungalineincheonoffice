@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>DG 대조 툴 - 흥아라인 인천사무소</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    background: #f0f2f5;
+    color: #1a1a2e;
+    font-size: 13px;
+  }
+
+  header {
+    background: #16213e;
+    color: #fff;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  header .logo { font-size: 18px; font-weight: 700; letter-spacing: 1px; color: #e94560; }
+  header .subtitle { font-size: 11px; color: #aaa; margin-top: 2px; }
+
+  .upload-area {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    padding: 20px 24px 0;
+  }
+
+  .upload-card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 18px;
+    border: 2px dashed #ccd;
+    transition: border-color 0.2s;
+  }
+  .upload-card.ready { border-color: #27ae60; border-style: solid; }
+  .upload-card h3 { font-size: 12px; color: #666; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .upload-card .filename { font-size: 13px; font-weight: 600; color: #16213e; margin-bottom: 10px; min-height: 18px; }
+  .upload-card .count { font-size: 11px; color: #888; }
+
+  .file-btn {
+    display: inline-block;
+    padding: 7px 14px;
+    background: #16213e;
+    color: #fff;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-top: 8px;
+  }
+  .file-btn:hover { background: #e94560; }
+  input[type=file] { display: none; }
+
+  .run-area {
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  #runBtn {
+    padding: 10px 28px;
+    background: #e94560;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  #runBtn:disabled { background: #bbb; cursor: not-allowed; }
+  #runBtn:hover:not(:disabled) { background: #c0392b; }
+
+  .summary-bar {
+    display: flex;
+    gap: 12px;
+    padding: 0 24px 16px;
+    flex-wrap: wrap;
+  }
+  .badge {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .badge.ok    { background: #d5f5e3; color: #1e8449; }
+  .badge.warn  { background: #fdebd0; color: #d35400; }
+  .badge.error { background: #fadbd8; color: #922b21; }
+  .badge.miss  { background: #e8daef; color: #6c3483; }
+
+  .result-area { padding: 0 24px 24px; }
+
+  .section-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 16px 0 8px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid #e0e0e0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+  th {
+    background: #16213e;
+    color: #fff;
+    padding: 8px 10px;
+    text-align: left;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  td {
+    padding: 7px 10px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: middle;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafafa; }
+
+  .row-ok   td { }
+  .row-warn td { background: #fff8f0; }
+  .row-error td { background: #fff0f0; }
+  .row-miss td { background: #f8f0ff; }
+
+  .tag {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .tag-ok    { background: #d5f5e3; color: #1e8449; }
+  .tag-warn  { background: #fdebd0; color: #d35400; }
+  .tag-error { background: #fadbd8; color: #922b21; }
+  .tag-miss  { background: #e8daef; color: #6c3483; }
+
+  .diff { color: #e74c3c; font-weight: 700; }
+  .same { color: #27ae60; }
+
+  #status { font-size: 12px; color: #888; }
+
+  .empty-msg {
+    text-align: center;
+    padding: 40px;
+    color: #bbb;
+    font-size: 14px;
+    background: #fff;
+    border-radius: 8px;
+  }
+
+  .col-cntr { width: 110px; }
+  .col-cert { width: 130px; }
+  .col-un   { width: 60px; }
+  .col-wt   { width: 90px; }
+  .col-psn  { min-width: 160px; }
+  .col-st   { width: 70px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">⚠ DG 대조 툴</div>
+    <div class="subtitle">흥아라인 인천사무소 · 검사증 vs 선사전송 자동 비교</div>
+  </div>
+</header>
+
+<div class="upload-area">
+  <div class="upload-card" id="card1">
+    <h3>① 검사증 데이터</h3>
+    <div style="font-size:11px;color:#999;margin-bottom:8px;">수출 PLISM &gt; DOCUMENT &gt; 위험물 관리 상세</div>
+    <div class="filename" id="name1">파일을 선택하세요</div>
+    <div class="count" id="count1"></div>
+    <label class="file-btn" for="file1">📂 파일 선택</label>
+    <input type="file" id="file1" accept=".xls,.xlsx">
+  </div>
+  <div class="upload-card" id="card2">
+    <h3>② 선사전송 데이터</h3>
+    <div style="font-size:11px;color:#999;margin-bottom:8px;">적하목록 &gt; 적하목록관리 및 하선신고 &gt; 위험물신고</div>
+    <div class="filename" id="name2">파일을 선택하세요</div>
+    <div class="count" id="count2"></div>
+    <label class="file-btn" for="file2">📂 파일 선택</label>
+    <input type="file" id="file2" accept=".xls,.xlsx">
+  </div>
+</div>
+
+<div class="run-area">
+  <button id="runBtn" disabled>▶ 대조 실행</button>
+  <span id="status"></span>
+</div>
+
+<div class="summary-bar" id="summaryBar"></div>
+
+<div class="result-area" id="resultArea">
+  <div class="empty-msg">파일 2개를 업로드하고 대조 실행을 눌러주세요.</div>
+</div>
+
+<script>
+let data1 = [], data2 = [];
+
+// ── 파일 읽기 ──────────────────────────────
+function readXLS(file, num) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb = XLSX.read(e.target.result, { type: 'binary' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    if (rows.length < 2) return;
+
+    const headers = rows[0].map(h => String(h).trim());
+    const parsed = [];
+
+    // 컨테이너 번호 형식: 영문4자 + 숫자7자 (예: SKLU1674806)
+    const cntrPattern = /^[A-Z]{4}\d{7}$/;
+    const cntrColIdx = headers.findIndex(h =>
+      ['CNTR NO','CNTR No','컨테이너번호'].includes(h)
+    );
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (row.every(c => c === '')) continue;
+      // 합계행 등 컨테이너 번호 형식 아닌 행 제거
+      if (cntrColIdx >= 0) {
+        const cntrVal = String(row[cntrColIdx] ?? '').trim();
+        if (!cntrPattern.test(cntrVal)) continue;
+      }
+      const obj = {};
+      headers.forEach((h, j) => obj[h] = String(row[j] ?? '').trim());
+      parsed.push(obj);
+    }
+
+    if (num === 1) {
+      data1 = parsed;
+      document.getElementById('name1').textContent = file.name;
+      document.getElementById('count1').textContent = `${parsed.length}건 로드됨`;
+      document.getElementById('card1').classList.add('ready');
+    } else {
+      data2 = parsed;
+      document.getElementById('name2').textContent = file.name;
+      document.getElementById('count2').textContent = `${parsed.length}건 로드됨`;
+      document.getElementById('card2').classList.add('ready');
+    }
+    checkReady();
+  };
+  reader.readAsBinaryString(file);
+}
+
+function checkReady() {
+  document.getElementById('runBtn').disabled = !(data1.length && data2.length);
+}
+
+document.getElementById('file1').addEventListener('change', e => {
+  if (e.target.files[0]) readXLS(e.target.files[0], 1);
+});
+document.getElementById('file2').addEventListener('change', e => {
+  if (e.target.files[0]) readXLS(e.target.files[0], 2);
+});
+
+// ── 컬럼 자동 감지 ──────────────────────────
+function detectCols(rows, candidates) {
+  if (!rows.length) return null;
+  const keys = Object.keys(rows[0]);
+  for (const c of candidates) {
+    if (keys.includes(c)) return c;
+  }
+  return null;
+}
+
+// ── 숫자 비교 (허용 오차 1kg) ───────────────
+function numClose(a, b) {
+  const na = parseFloat(a), nb = parseFloat(b);
+  if (isNaN(na) || isNaN(nb)) return false;
+  return Math.abs(na - nb) <= 1;
+}
+
+// ── PSN 유사 비교 ───────────────────────────
+function psnMatch(a, b) {
+  const clean = s => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const ca = clean(a), cb = clean(b);
+  return ca === cb || ca.startsWith(cb) || cb.startsWith(ca);
+}
+
+// ── 대조 실행 ────────────────────────────────
+document.getElementById('runBtn').addEventListener('click', () => {
+  document.getElementById('status').textContent = '분석 중...';
+
+  // 컬럼 감지 - 검사증(data1)
+  const c1 = {
+    cntr:  detectCols(data1, ['CNTR NO','CNTR No','컨테이너번호']),
+    cert:  detectCols(data1, ['검사증 번호','검사증번호','검사증번호(MRN)']),
+    un:    detectCols(data1, ['UNDG','UN NO','UNNO']),
+    wt:    detectCols(data1, ['WEIGHT','중량','총중량']),
+    psn:   detectCols(data1, ['ITEM','적정선적명','PSN']),
+    imdg:  detectCols(data1, ['IMDG']),
+    pg:    detectCols(data1, ['PG']),
+  };
+
+  // 컬럼 감지 - 선사전송(data2)
+  const c2 = {
+    cntr:  detectCols(data2, ['CNTR No','CNTR NO','컨테이너번호']),
+    cert:  detectCols(data2, ['검사증번호(MRN)','검사증 번호','검사증번호']),
+    un:    detectCols(data2, ['UNNO','UNDG','UN NO']),
+    wt:    detectCols(data2, ['총중량','WEIGHT','중량']),
+    psn:   detectCols(data2, ['적정선적명','ITEM','PSN']),
+    imdg:  detectCols(data2, ['IMDG']),
+  };
+
+  // 숫자 정규화 (소수점 .0 제거, 반올림 1자리)
+  function normWt(v) {
+    const n = parseFloat(v);
+    return isNaN(n) ? '' : String(Math.round(n * 10) / 10);
+  }
+  function normUN(v) {
+    return String(v || '').replace(/\.0$/, '').trim();
+  }
+
+  // data2 → CNTR+UN+중량 3중 키로 인덱싱 (남은 항목 추적용 복사본)
+  const pool2 = data2.map((row, idx) => ({
+    row, idx, used: false,
+    cntr: row[c2.cntr] || '',
+    un:   normUN(row[c2.un]),
+    wt:   normWt(row[c2.wt]),
+    psn:  row[c2.psn] || '',
+    cert: row[c2.cert] || '',
+    imdg: row[c2.imdg] || '',
+  }));
+
+  const results = [];
+
+  // data1 각 행을 순서대로 처리
+  data1.forEach(row1 => {
+    const cntr = row1[c1.cntr] || '';
+    const un   = normUN(row1[c1.un]);
+    const wt1  = normWt(row1[c1.wt]);
+    const psn1 = row1[c1.psn] || '';
+    const cert = row1[c1.cert] || '';
+    const imdg = row1[c1.imdg] || '';
+    const pg   = c1.pg ? (row1[c1.pg] || '') : '';
+
+    // 1순위: CNTR + UN + 중량 완전 일치
+    let matched = pool2.find(p =>
+      !p.used && p.cntr === cntr && p.un === un && p.wt === wt1
+    );
+
+    // 2순위: CNTR + UN 일치 (중량 근사)
+    if (!matched) {
+      matched = pool2.find(p =>
+        !p.used && p.cntr === cntr && p.un === un && numClose(p.wt, wt1)
+      );
+    }
+
+    // 3순위: CNTR + UN 일치 (중량 무관 - 불일치로 표시)
+    if (!matched) {
+      matched = pool2.find(p =>
+        !p.used && p.cntr === cntr && p.un === un
+      );
+    }
+
+    if (!matched) {
+      // 선사전송에 아예 없음
+      results.push({
+        status: 'miss',
+        cntr, cert, un, imdg, pg,
+        wt1, wt2: '-', psn1, psn2: '-',
+        issues: ['선사전송 누락']
+      });
+    } else {
+      matched.used = true;
+      const wt2  = matched.wt;
+      const psn2 = matched.psn;
+
+      const issues = [];
+      const wtOk  = numClose(wt1, wt2);
+      const psnOk = psnMatch(psn1, psn2);
+
+      if (!wtOk)  issues.push(`중량 불일치 (검사증:${wt1} / 선사:${wt2})`);
+      if (!psnOk) issues.push(`PSN 불일치`);
+
+      results.push({
+        status: issues.length === 0 ? 'ok' : 'warn',
+        cntr, cert, un, imdg, pg,
+        wt1, wt2, psn1, psn2,
+        issues
+      });
+    }
+  });
+
+  // data2 중 매칭 못된 항목 → 검사증 누락
+  pool2.filter(p => !p.used).forEach(p => {
+    results.push({
+      status: 'extra',
+      cntr: p.cntr, cert: p.cert, un: p.un, imdg: p.imdg, pg: '',
+      wt1: '-', wt2: p.wt, psn1: '-', psn2: p.psn,
+      issues: ['검사증 누락 (선사전송에만 존재)']
+    });
+  });
+
+  renderResults(results);
+  document.getElementById('status').textContent = `총 ${results.length}건 분석 완료`;
+});
+
+// ── 렌더링 ───────────────────────────────────
+function renderResults(results) {
+  const ok    = results.filter(r => r.status === 'ok');
+  const warn  = results.filter(r => r.status === 'warn');
+  const miss  = results.filter(r => r.status === 'miss');
+  const extra = results.filter(r => r.status === 'extra');
+  const issues = [...warn, ...miss, ...extra];
+
+  // 요약 배지
+  document.getElementById('summaryBar').innerHTML = `
+    <span class="badge ok">✅ 일치 ${ok.length}건</span>
+    <span class="badge warn">⚠ 불일치 ${warn.length}건</span>
+    <span class="badge miss">❌ 선사전송 누락 ${miss.length}건</span>
+    <span class="badge error">🔺 검사증 누락 ${extra.length}건</span>
+  `;
+
+  let html = '';
+
+  // 문제 항목 먼저
+  if (issues.length > 0) {
+    html += `<div class="section-title">⚠ 확인 필요 항목 (${issues.length}건)</div>`;
+    html += buildTable(issues, true);
+  }
+
+  // 정상 항목
+  if (ok.length > 0) {
+    html += `<div class="section-title">✅ 일치 항목 (${ok.length}건)</div>`;
+    html += buildTable(ok, false);
+  }
+
+  document.getElementById('resultArea').innerHTML = html || '<div class="empty-msg">결과 없음</div>';
+}
+
+function buildTable(rows, showIssue) {
+  let html = `<table>
+    <thead><tr>
+      <th class="col-st">상태</th>
+      <th class="col-cntr">컨테이너</th>
+      <th class="col-cert">검사증번호</th>
+      <th class="col-un">UN No.</th>
+      <th>IMDG</th>
+      <th>PG</th>
+      <th class="col-wt">중량(검사증)</th>
+      <th class="col-wt">중량(선사)</th>
+      <th class="col-psn">PSN(검사증)</th>
+      <th class="col-psn">PSN(선사)</th>
+      ${showIssue ? '<th>이슈</th>' : ''}
+    </tr></thead><tbody>`;
+
+  rows.forEach(r => {
+    const rowCls = r.status === 'ok' ? 'row-ok'
+                 : r.status === 'miss' ? 'row-miss'
+                 : r.status === 'extra' ? 'row-error'
+                 : 'row-warn';
+
+    const tag = r.status === 'ok'    ? '<span class="tag tag-ok">일치</span>'
+              : r.status === 'miss'  ? '<span class="tag tag-miss">누락</span>'
+              : r.status === 'extra' ? '<span class="tag tag-error">미신고</span>'
+              :                       '<span class="tag tag-warn">불일치</span>';
+
+    const wtOk  = numClose(r.wt1, r.wt2);
+    const psnOk = psnMatch(r.psn1 || '', r.psn2 || '');
+
+    const wt1disp  = `<span class="${wtOk || r.wt2==='-' ? 'same' : 'diff'}">${r.wt1}</span>`;
+    const wt2disp  = `<span class="${wtOk || r.wt1==='-' ? 'same' : 'diff'}">${r.wt2}</span>`;
+    const psn1disp = `<span class="${psnOk || r.psn2==='-' ? '' : 'diff'}">${r.psn1}</span>`;
+    const psn2disp = `<span class="${psnOk || r.psn1==='-' ? '' : 'diff'}">${r.psn2}</span>`;
+
+    html += `<tr class="${rowCls}">
+      <td>${tag}</td>
+      <td>${r.cntr}</td>
+      <td style="font-size:11px">${r.cert}</td>
+      <td><b>${r.un}</b></td>
+      <td>${r.imdg}</td>
+      <td>${r.pg}</td>
+      <td>${wt1disp}</td>
+      <td>${wt2disp}</td>
+      <td style="font-size:11px">${psn1disp}</td>
+      <td style="font-size:11px">${psn2disp}</td>
+      ${showIssue ? `<td style="font-size:11px;color:#c0392b">${r.issues.join('<br>')}</td>` : ''}
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  return html;
+}
+</script>
+</body>
+</html>

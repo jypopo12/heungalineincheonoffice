@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>인천사무소 업무 툴</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg:        #0d1117;
+    --surface:   #161b22;
+    --surface2:  #1c2330;
+    --border:    #30363d;
+    --accent:    #f0883e;
+    --accent2:   #388bfd;
+    --text:      #e6edf3;
+    --text-sub:  #7d8590;
+    --text-dim:  #484f58;
+    --ok:        #3fb950;
+    --warn:      #f0883e;
+    --chip-bg:   #21262d;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'IBM Plex Sans KR', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── 상단 nav ── */
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 40px;
+    height: 56px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .nav-icon {
+    width: 28px; height: 28px;
+    background: var(--accent);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .nav-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: 0.3px;
+  }
+  .nav-sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-sub);
+    margin-left: 4px;
+  }
+  .nav-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    background: var(--chip-bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    color: var(--text-sub);
+  }
+
+  /* ── 히어로 ── */
+  .hero {
+    padding: 64px 40px 48px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(240,136,62,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .hero-title {
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.5px;
+    margin-bottom: 12px;
+  }
+  .hero-title span { color: var(--accent); }
+  .hero-desc {
+    font-size: 14px;
+    color: var(--text-sub);
+    line-height: 1.7;
+    max-width: 480px;
+    margin-bottom: 28px;
+  }
+  .hero-stats {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .stat-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .stat-label {
+    font-size: 11px;
+    color: var(--text-sub);
+  }
+  .stat-num.live::after {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: var(--ok);
+    border-radius: 50%;
+    margin-left: 6px;
+    vertical-align: middle;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* ── 툴 그리드 ── */
+  .section {
+    padding: 40px 40px;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .section-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-sub);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .section-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+  }
+
+  /* ── 카드 ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.2s;
+  }
+  .card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  .card:hover::before { transform: scaleX(1); }
+
+  .card.disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+  .card.disabled:hover {
+    border-color: var(--border);
+    transform: none;
+    box-shadow: none;
+  }
+  .card.disabled:hover::before { transform: scaleX(0); }
+
+  .card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .card-icon {
+    width: 40px; height: 40px;
+    background: var(--chip-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .badge-live {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    background: rgba(63, 185, 80, 0.12);
+    border: 1px solid rgba(63, 185, 80, 0.3);
+    color: var(--ok);
+    border-radius: 20px;
+  }
+  .badge-soon {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    background: rgba(240, 136, 62, 0.12);
+    border: 1px solid rgba(240, 136, 62, 0.3);
+    color: var(--warn);
+    border-radius: 20px;
+  }
+
+  .card-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    line-height: 1.3;
+  }
+  .card-desc {
+    font-size: 12px;
+    color: var(--text-sub);
+    line-height: 1.6;
+    margin-bottom: 20px;
+  }
+  .card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .card-meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+  .card-arrow {
+    font-size: 14px;
+    color: var(--text-dim);
+    transition: color 0.15s, transform 0.15s;
+  }
+  .card:hover .card-arrow {
+    color: var(--accent);
+    transform: translateX(3px);
+  }
+
+  /* 태그 */
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 2px 7px;
+    background: var(--chip-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-sub);
+  }
+  .tl-content { flex: 1; }
+  .tl-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+  .tl-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 3px;
+  }
+  .tl-desc {
+    font-size: 12px;
+    color: var(--text-sub);
+  }
+
+  /* ── footer ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .footer-left {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .footer-right {
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  /* 모달 */
+  .modal-bg {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    max-width: 420px;
+    width: 90%;
+    text-align: center;
+  }
+  .modal-icon { font-size: 36px; margin-bottom: 16px; }
+  .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .modal-desc { font-size: 13px; color: var(--text-sub); line-height: 1.6; margin-bottom: 24px; }
+  .modal-close {
+    padding: 9px 24px;
+    background: var(--chip-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .modal-close:hover { border-color: var(--accent); color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- nav -->
+<nav>
+  <div class="nav-brand">
+    <div class="nav-icon">⚓</div>
+    <span class="nav-title">인천사무소 업무 자동화 AI</span>
+    
+  </div>
+  <span class="nav-badge">v1.2.0</span>
+</nav>
+
+<!-- hero -->
+<div class="hero">
+  <div class="hero-eyebrow">INCHEON OFFICE · HEUNG-A LINE</div>
+  <h1 class="hero-title">인천사무소<br><span>업무 자동화 AI</span></h1>
+</div>
+
+<!-- 수출 -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-label">수출 EXPORT</span>
+    <div class="section-line"></div>
+  </div>
+  <div class="grid">
+
+    <a class="card" href="DG_비교툴.html">
+      <div class="card-top">
+        <div class="card-icon">⚖️</div>
+        <span class="badge-live">● LIVE</span>
+      </div>
+      <div class="card-title">DG 검사증 vs 선사전송 대조</div>
+      <div class="tags">
+        <span class="tag">PLISM</span>
+        <span class="tag">hasR</span>
+        <span class="tag">XLS</span>
+      </div>
+      <div class="card-desc">검사증 데이터(PLISM)와 선사전송 데이터(hasR)를 자동 비교합니다. UN No. 불일치, 중량 차이, 누락 항목을 한눈에 확인.</div>
+      <div class="card-footer">
+        <span class="card-meta">파일 2개 업로드 → 즉시 비교</span>
+        <span class="card-arrow">→</span>
+      </div>
+    </a>
+
+    <div class="card disabled" onclick="showModal('cbf')">
+      <div class="card-top">
+        <div class="card-icon">📦</div>
+        <span class="badge-soon">준비중</span>
+      </div>
+      <div class="card-title">CBF 자동기입</div>
+      <div class="tags">
+        <span class="tag">Container Booking Forecast</span>
+      </div>
+      <div class="card-desc">컨테이너 부킹 정보를 입력하면 CBF 양식을 자동으로 채워줍니다. 반복 수작업 입력을 줄입니다.</div>
+      <div class="card-footer">
+        <span class="card-meta">양식 자동 작성</span>
+        <span class="card-arrow">→</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 수입 -->
+<div class="section" style="padding-top:0">
+  <div class="section-header">
+    <span class="section-label">수입 IMPORT</span>
+    <div class="section-line"></div>
+  </div>
+  <div class="grid">
+
+    <a class="card" href="BL분석툴.html">
+      <div class="card-top">
+        <div class="card-icon">🔍</div>
+        <span class="badge-live">● LIVE</span>
+      </div>
+      <div class="card-title">MAIN ITEM vs DESC 대조</div>
+      <div class="tags">
+        <span class="tag">B/L</span>
+        <span class="tag">적하목록</span>
+        <span class="tag">XLS</span>
+      </div>
+      <div class="card-desc">B/L의 품명(MAIN ITEM)과 화물 설명(DESC) 간 불일치를 자동으로 찾아냅니다. 선적 전 오류 사전 방지.</div>
+      <div class="card-footer">
+        <span class="card-meta">파일 업로드 → 즉시 분석</span>
+        <span class="card-arrow">→</span>
+      </div>
+    </a>
+
+  </div>
+</div>
+
+<footer>
+  <span class="footer-left">HEUNG-A LINE · 인천사무소</span>
+  <span class="footer-right">업무 자동화 AI v1.2.0</span>
+</footer>
+
+<!-- 모달 -->
+<div class="modal-bg" id="modal" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-icon" id="modalIcon">🚧</div>
+    <div class="modal-title" id="modalTitle"></div>
+    <div class="modal-desc" id="modalDesc"></div>
+    <button class="modal-close" onclick="closeModal()">확인</button>
+  </div>
+</div>
+
+<script>
+const modalData = {
+  cbf: {
+    icon: '📦',
+    title: 'CBF 자동기입',
+    desc: 'Container Booking Forecast 양식을 자동으로 채워주는 툴입니다. 현재 개발 예정 중입니다.'
+  },
+  item: {
+    icon: '🔍',
+    title: 'MAIN ITEM vs DESC 대조',
+    desc: 'B/L 품명과 화물 설명 간 불일치를 자동으로 찾아내는 툴입니다. 현재 개발 예정 중입니다.'
+  },
+};
+
+function showModal(key) {
+  const d = modalData[key];
+  document.getElementById('modalIcon').textContent = d.icon;
+  document.getElementById('modalTitle').textContent = d.title;
+  document.getElementById('modalDesc').textContent = d.desc;
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal(e) {
+  if (!e || e.target === document.getElementById('modal')) {
+    document.getElementById('modal').classList.remove('open');
+  }
+}
+</script>
+</body>
+</html>
